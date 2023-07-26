@@ -23,7 +23,7 @@ func MainHandler(c *gin.Context) {
 
 	authHeaderChunks := strings.Split(authHeader, " ")
 	if len(authHeaderChunks) != 2 || authHeaderChunks[0] != "Bearer" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "heroviy header"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid header"})
 		return
 	}
 
@@ -76,15 +76,12 @@ func MainHandler(c *gin.Context) {
 
 	var newClaims models.MSClaims
 	verifiedToken, err := jwt.ParseWithClaims(tokenString, &newClaims, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-
+		// no need to verify token's signing method since it's been already done above
 		return jwt.ParseRSAPublicKeyFromPEM([]byte(tokenSecret))
 	})
 
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error(), "tokenString": tokenString})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
 	if !verifiedToken.Valid {
@@ -95,11 +92,11 @@ func MainHandler(c *gin.Context) {
 	azureAdClientId := os.Getenv("AZURE_AD_CLIENT_ID")
 	azureAdTenantId := os.Getenv("AZURE_AD_TENANT_ID")
 	if newClaims.Aud != fmt.Sprintf("api://%s", azureAdClientId) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong audience"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid audience"})
 		return
 	}
 	if newClaims.Iss != fmt.Sprintf("https://sts.windows.net/%s/", azureAdTenantId) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong issuer"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid issuer"})
 		return
 	}
 	if int64(newClaims.Exp) < time.Now().Unix() {
